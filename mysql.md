@@ -33,21 +33,49 @@ innoDB와 대조적으로 MyISAM은 트랜잭션 지원이없다.(참조 무결�
 
 
 ##### 규칙 기반 최적화 (Rule-based optimizer, RBO, 망한 기술)
-    * 기본저긍로 대상 테이블의 레코드 건수나 선택도 등을 고려하지않음
-    * 옵티마이저에 내장된 우선순위에 따라 실행계획을 수립
-    * 같은 쿼리에 따라 같은 실행방법을 만든다.
+* 기본저긍로 대상 테이블의 레코드 건수나 선택도 등을 고려하지않음
+* 옵티마이저에 내장된 우선순위에 따라 실행계획을 수립
+* 같은 쿼리에 따라 같은 실행방법을 만든다.
 
 ##### 비용 기반 최적화 (Cost-based optimizer, CBO)
-    * 여러가지 방법중, 각 단위 작업의 비용 정보와 대상 테이블의 예측 된 통계정볼르 이용해 각 실행 계획별 비용 산출
-    * 각 계획 중 최소비용이 소요되는 방식을 택함
+* 여러가지 방법중, 각 단위 작업의 비용 정보와 대상 테이블의 예측 된 통계정볼르 이용해 각 실행 계획별 비용 산출
+* 각 계획 중 최소비용이 소요되는 방식을 택함
 
 ###### 통계정보 
-    * MySQL은 이 통계정보가 다양하지 않다.(동적으로 순간순간 자동으로 변경) <-> 오라클은 정적이고 수집에 많은 시간 소요(백업하는 경우도 있음)
-    * 레코드 건 수, 인덱스의 유니크한 값의 개수 정도
-    * 통계정보가 부정확한 경우, ANALYZE로 강제적으로 통계 정보를 갱신해야 할 때도 있다.
+* MySQL은 이 통계정보가 다양하지 않다.(동적으로 순간순간 자동으로 변경) <-> 오라클은 정적이고 수집에 많은 시간 소요(백업하는 경우도 있음)
+* 레코드 건 수, 인덱스의 유니크한 값의 개수 정도
+* 통계정보가 부정확한 경우, ANALYZE로 강제적으로 통계 정보를 갱신해야 할 때도 있다.
 
 #### 실행계획 분석
-    ```
-        EXPLAIN 
-        /* 쿼리문 */
+```
+    EXPLAIN 
+    /* 쿼리문 */
+```
+* select_type
+    * SELECT 쿼리가 어떤 타입의 쿼리인지 표시 된다.
+    * SIMPLE: UNION 이나 서브 쿼리를 사용하지 않는 단순한 SELECT 쿼리인 경우
+        * 아무리 복잡한 쿼리라도 SIMPE인 단위 쿼리는 반드시 하나 존재한다.
+        * 일반적으로 제일 바깥 SELECT쿼리의 select_type이 SIMPLE로 표시된다.
+    * PRIMARY: UNION이나 서브쿼리가 포함된 SELECT 쿼리의 실행계획에서 제일 바깥쪽에 있는 단위쿼리
+        * 하나만 존재하며, 제일 바깥쪽이 PRIMARY로 포함된다.
+    * UNION: UNION으로 결합하는 단위 SELECT 쿼리 가운데 첫 번째를 제외한 두 번째 이후 단위 SELECT 쿼리의 select_type
+        * UNION의 첫 번째 단위 SELECT는 select_type이 UNION이 아니라 UNION 쿼리로 결합된 전체 집합의 select_type이 표시된다.
+        * UNION의 첫 번째 타입은 UNION결과를 대표하는 select_type으로 설정됨
+    * DEPENDENT UNION: UNION이나 UNIONALL로 결합된 단위 쿼리가 외부의 영향을 받는 것
+        * 서브쿼리가 사용된 경우에는 외부 쿼리보다 서브쿼리가 먼저 실행되는 것이 일반적이며 
+        빠르게 처리되지만, DEPENDENT 키워드를 포함하는 서브쿼리는 외부 쿼리에 의존적이며 절대 외부쿼리보다 먼저 실행될 수 없다. 그래서 DEPENDENT 키워드가 포함된 서버쿼리는 비효율 적인 경우가 많다.
+    ``` sql
+    -- 예시 쿼리
+    EXPLAIN 
+    SELECT
+    e.first_name,
+    (   SELECT CONCAT('Salary change count : ', COUNT(*)) AS message
+        FROM salaries s WHERE s.emp_no=e.emp_no -- 단위쿼리가 외부의 값을 참조해서 처리한다. e.emp_no
+        UNION 
+        SELECT CONCAT('Department change count : ', COUNT(*)) AS message
+        FROM dept_emp de WHERE de.emp_no=e.emp_no
+        UNION
+    ) AS message
+    FROM employees e
+    WHERE e.emp_no=10001
     ```
